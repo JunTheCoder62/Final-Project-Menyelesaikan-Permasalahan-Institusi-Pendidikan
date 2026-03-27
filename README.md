@@ -19,6 +19,7 @@ Setup environment:
 ```
 
 ## Business Dashboard
+Link : [Dashboard](https://lookerstudio.google.com/reporting/0cfbe2da-1f8b-41cd-b79e-67ec3e9bbd85)
 Jelaskan tentang business dashboard yang telah dibuat. Jika ada, sertakan juga link untuk mengakses dashboard tersebut.
 
 ## Menjalankan Sistem Machine Learning
