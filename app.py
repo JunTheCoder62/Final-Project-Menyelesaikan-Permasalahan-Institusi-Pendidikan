@@ -7,132 +7,199 @@ Original file is located at
     https://colab.research.google.com/drive/1uunVplbSEcy5sv3BJ9XQ_zhiRGYw2VAh
 """
 
-
-
-import sys
 import streamlit as st
 import pandas as pd
-import joblib
 import numpy as np
+import joblib
 
-# Load model dan preprocessor
-@st.cache_resource
-def load_models():
-    model = joblib.load('xgboost_model.pkl')
-    return model
+model = joblib.load('xgboost_model.pkl')
+image = 'Juniyara Parisya Setiawan-Dashboard.jpg'
 
-model = load_models()
+def display_sidebar():
+    st.sidebar.subheader("Masukkan Data Siswa")
 
-# Mapping label untuk tampilan (sesuaikan dengan target variabel setelah pemrosesan di notebook)
-# Asumsi: 0 = Dropout, 1 = Enrolled/Graduate (setelah replace(2, median_status))
-label_map = {0: 'Dropout', 1: 'Enrolled/Graduate'}
+    marital_status = st.sidebar.selectbox("Status Pernikahan", ["Single", "Married", "Divorced"], key='marital_status')
+    application_mode = st.sidebar.selectbox("Mode Pendaftaran", [
+        "1st phase - general contingent",
+        "2nd phase - general contingent",
+        "International student (bachelor)",
+        "Over 23 years old",
+        "Change of course",
+        "Technological specialization diploma holders",
+        "Holders of other higher courses",
+        "3rd phase - general contingent",
+        "Transfer",
+        "Change of institution/course",
+        "1st phase - special contingent (Madeira Island)",
+        "Short cycle diploma holders",
+        "1st phase - special contingent (Azores Island)",
+        "Ordinance No. 854-B/99",
+        "Ordinance No. 612/93",
+        "Change of institution/course (International)",
+        "Ordinance No. 533-A/99, item b2 (Different Plan)",
+        "Ordinance No. 533-A/99, item b3 (Other Institution)"
+    ], key='application_mode')
+    application_order = st.sidebar.selectbox("Pilihan Kursus", ["First Choice", "Second Choice"], key='application_order')
+    course = st.sidebar.selectbox("Program Studi", [
+        "Animation and Multimedia Design",
+        "Tourism",
+        "Communication Design",
+        "Journalism and Communication",
+        "Social Service (evening attendance)",
+        "Management",
+        "Social Service",
+        "Veterinary Nursing",
+        "Advertising and Marketing Management",
+        "Management (evening attendance)",
+        "Agronomy",
+        "Basic Education",
+        "Informatics Engineering",
+        "Equinculture",
+        "Oral Hygiene",
+        "Biofuel Production Technologies"
+    ], key='course')
+    daytime_evening_attendance = st.sidebar.selectbox("Waktu Kuliah", ["Daytime", "Evening"], key='daytime_evening_attendance')
+    previous_qualification_grade = st.sidebar.slider("Nilai Kualifikasi Sebelumnya", min_value=0, max_value=200, step=1, key='previous_qualification_grade')
+    nationality = st.sidebar.selectbox("Kebangsaan", [
+        "Portuguese",
+        "German",
+        "Spanish",
+        "Italian",
+        "Dutch",
+        "English",
+        "Lithuanian",
+        "Angolan",
+        "Cape Verdean",
+        "Guinean",
+        "Mozambican",
+        "Santomean",
+        "Turkish",
+        "Brazilian",
+        "Romanian",
+        "Moldova (Republic of)",
+        "Mexican",
+        "Ukrainian",
+        "Russian",
+        "Cuban",
+        "Colombian"
+    ], key='nationality')
+    mothers_qualification = st.sidebar.selectbox("Kualifikasi Ibu", [
+        "Basic Education",
+        "Secondary Education",
+        "Higher Education",
+        "Other"
+    ], key='mothers_qualification')
+    fathers_qualification = st.sidebar.selectbox("Kualifikasi Ayah", [
+        "Basic Education",
+        "Secondary Education",
+        "Higher Education",
+        "Other"
+    ], key='fathers_qualification')
+    mothers_occupation = st.sidebar.selectbox("Pekerjaan Ibu", [
+        "Unskilled Workers",
+        "Administrative Staff",
+        "Service Workers",
+        "Technicians",
+        "Professionals",
+        "Skilled Workers",
+        "Student",
+        "Managers",
+        "Agricultural Workers",
+        "Other",
+        "Machine Operators"
+    ], key='mothers_occupation')
+    fathers_occupation = st.sidebar.selectbox("Pekerjaan Ayah", [
+        "Unskilled Workers",
+        "Skilled Workers",
+        "Service Workers",
+        "Administrative Staff",
+        "Technicians",
+        "Machine Operators",
+        "Armed Forces",
+        "Agricultural Workers",
+        "Professionals",
+        "Managers",
+        "Student",
+        "Other"
+    ], key='fathers_occupation')
+    admission_grade = st.sidebar.slider("Nilai Penerimaan", min_value=0, max_value=200, step=1, key='admission_grade')
+    displaced = st.sidebar.selectbox("Apakah siswa tersebut adalah orang yang terlantar", ["Yes", "No"], key='displaced')
+    educational_special_needs = st.sidebar.selectbox("Kebutuhan Pendidikan Khusus", ["Yes", "No"], key='educational_special_needs')
+    debtor = st.sidebar.selectbox("Debitor", ["Yes", "No"], key='debtor')
+    tuition_fees_up_to_date = st.sidebar.selectbox("Biaya Kuliah Terbayar", ["Yes", "No"], key='tuition_fees_up_to_date')
+    gender = st.sidebar.selectbox("Jenis Kelamin", ["Male", "Female"], key='gender')
+    scholarship_holder = st.sidebar.selectbox("Penerima Beasiswa", ["Yes", "No"], key='scholarship_holder')
+    age_at_enrollment = st.sidebar.number_input("Usia Saat Pendaftaran", key='age_at_enrollment', format='%f')
+    international = st.sidebar.selectbox("Apakah siswa tersebut adalah siswa internasional", ["Yes", "No"], key='international')
+    curricular_units_1st_sem_credited = st.sidebar.number_input("Curricular units 1st sem (credited)", min_value=0, key='curricular_units_1st_sem_credited')
+    curricular_units_1st_sem_enrolled = st.sidebar.number_input("Curricular units 1st sem (enrolled)", min_value=0, key='curricular_units_1st_sem_enrolled')
+    curricular_units_1st_sem_evaluations = st.sidebar.number_input("Curricular units 1st sem (evaluations)", min_value=0, key='curricular_units_1st_sem_evaluations')
+    curricular_units_1st_sem_grade = st.sidebar.number_input("Curricular units 1st sem (grade)", key='curricular_units_1st_sem_grade')
+    curricular_units_1st_sem_approved = st.sidebar.number_input("Curricular units 1st sem (approved)", min_value=0, key='curricular_units_1st_sem_approved')
+    curricular_units_1st_sem_without_evaluations = st.sidebar.number_input("Curricular units 1st sem (without evaluations)", key='curricular_units_1st_sem_without_evaluations')
+    curricular_units_2nd_sem_without_evaluations = st.sidebar.number_input("Curricular units 2nd sem (without evaluations)", key='curricular_units_2nd_sem_without_evaluations')
+    unemployment_rate = st.sidebar.number_input("Unemployment Rate", key='unemployment_rate', format='%f')
+    inflation_rate = st.sidebar.number_input("Inflation Rate", key='inflation_rate', format='%f')
+    gdp = st.sidebar.number_input("GDP", key='gdp', format='%f')
+    input_data = pd.DataFrame({
+        'Previous_qualification_grade': [previous_qualification_grade],
+        'Admission_grade': [admission_grade],
+        'Age_at_enrollment': [age_at_enrollment],
+        'Curricular_units_1st_sem_credited': [curricular_units_1st_sem_credited],
+        'Curricular_units_1st_sem_evaluations': [curricular_units_1st_sem_evaluations],
+        'Curricular_units_1st_sem_grade': [curricular_units_1st_sem_grade],
+        'Curricular_units_1st_sem_without_evaluations': [curricular_units_1st_sem_without_evaluations],
+        'Curricular_units_2nd_sem_without_evaluations': [curricular_units_2nd_sem_without_evaluations],
+        'Unemployment_rate': [unemployment_rate],
+        'Inflation_rate': [inflation_rate],
+        'GDP': [gdp],
+        'Application_mode': [application_mode],
+        'Application_order': [application_order],
+        'Course': [course],
+        'Mothers_qualification': [mothers_qualification],
+        'Fathers_qualification': [fathers_qualification],
+        'Mothers_occupation': [mothers_occupation],
+        'Fathers_occupation': [fathers_occupation],
+        'Displaced': [displaced],
+        'Gender': [gender]
+    })
 
-st.title("Prediksi Status Siswa (Dropout/Enrolled/Graduate)")
-st.markdown("Masukkan data siswa untuk prediksi status kelulusan menggunakan XGBoost.")
+    return input_data
 
-# Define the exact features used by the preprocessor during model training
-numerical_cols = [
-    'Previous_qualification_grade', 'Admission_grade', 'Age_at_enrollment',
-    'Curricular_units_1st_sem_credited', 'Curricular_units_1st_sem_evaluations',
-    'Curricular_units_1st_sem_grade', 'Curricular_units_1st_sem_without_evaluations',
-    'Curricular_units_2nd_sem_without_evaluations', 'Unemployment_rate',
-    'Inflation_rate', 'GDP'
-]
-categorical_cols = [
-    'Application_mode', 'Application_order', 'Course', 'Mothers_qualification',
-    'Fathers_qualification', 'Mothers_occupation', 'Fathers_occupation',
-    'Displaced', 'Gender'
-]
+def predict_status_proba(model, data):
+    prediction_proba = model.predict_proba(data)
+    return prediction_proba
 
-feature_columns = numerical_cols + categorical_cols
+def main():
+    st.set_page_config(page_title="Aplikasi Prediksi Dropout", page_icon=":bar_chart:", layout="wide")
 
-# Buat input form dengan columns untuk layout rapi
-with st.form("prediction_form"):
-    st.subheader("Input Data Siswa")
+    st.image(image, use_column_width=True)
 
-    # Sidebar for numerical features
-    st.sidebar.header("Numerical Features")
-    age_at_enrollment = st.sidebar.slider("Age at Enrollment", 17, 70, 20)
-    admission_grade = st.sidebar.slider("Admission Grade", 0.0, 200.0, 120.0)
-    prev_qual_grade = st.sidebar.slider("Previous Qualification Grade", 0.0, 200.0, 120.0)
-    cu1_credited = st.sidebar.slider("Curricular Units 1st Sem Credited", 0, 30, 0)
-    cu1_evaluations = st.sidebar.slider("Curricular Units 1st Sem Evaluations", 0, 30, 6)
-    cu1_grade = st.sidebar.slider("Curricular Units 1st Sem Grade", 0.0, 20.0, 12.0)
-    cu1_without_evals = st.sidebar.slider("Curricular Units 1st Sem Without Evaluations", 0, 10, 0)
-    cu2_without_evals = st.sidebar.slider("Curricular Units 2nd Sem Without Evaluations", 0, 10, 0)
-    unemployment_rate = st.sidebar.slider("Unemployment Rate", 0.0, 20.0, 10.0)
-    inflation_rate = st.sidebar.slider("Inflation Rate", -5.0, 10.0, 1.0)
-    gdp = st.sidebar.slider("GDP", -10.0, 10.0, 0.0)
+    input_data = display_sidebar()
 
-    # Main area for categorical features
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        application_mode = st.selectbox("Application Mode", list(range(1, 19)), index=0)
-        application_order = st.selectbox("Application Order", list(range(1, 7)), index=0)
-        gender = st.selectbox("Gender", [0, 1], format_func=lambda x: "Female" if x==1 else "Male")
-    with col2:
-        course = st.selectbox("Course", list(range(1, 19)), index=0)
-        mothers_qualification = st.selectbox("Mothers Qualification", list(range(1, 40)), index=0)
-        fathers_qualification = st.selectbox("Fathers Qualification", list(range(1, 40)), index=0)
-    with col3:
-        mothers_occupation = st.selectbox("Mothers Occupation", list(range(1, 50)), index=0)
-        fathers_occupation = st.selectbox("Fathers Occupation", list(range(1, 50)), index=0)
-        displaced = st.selectbox("Displaced", [0, 1], format_func=lambda x: "Yes" if x==1 else "No")
+    st.markdown("***")
 
-    # Kumpulkan semua input ke dict
-    input_data = {
-        'Age_at_enrollment': age_at_enrollment,
-        'Admission_grade': admission_grade,
-        'Previous_qualification_grade': prev_qual_grade,
-        'Curricular_units_1st_sem_credited': cu1_credited,
-        'Curricular_units_1st_sem_evaluations': cu1_evaluations,
-        'Curricular_units_1st_sem_grade': cu1_grade,
-        'Curricular_units_1st_sem_without_evaluations': cu1_without_evals,
-        'Curricular_units_2nd_sem_without_evaluations': cu2_without_evals,
-        'Unemployment_rate': unemployment_rate,
-        'Inflation_rate': inflation_rate,
-        'GDP': gdp,
-        'Application_mode': application_mode,
-        'Application_order': application_order,
-        'Course': course,
-        'Mothers_qualification': mothers_qualification,
-        'Fathers_qualification': fathers_qualification,
-        'Mothers_occupation': mothers_occupation,
-        'Fathers_occupation': fathers_occupation,
-        'Displaced': displaced,
-        'Gender': gender
-    }
+    if st.sidebar.button("Prediksi"):
+        if input_data.isnull().values.any():
+            st.error("Harap isi semua data siswa terlebih dahulu.")
+        else:
+            prediction_proba = predict_status_proba(model, input_data)
+            dropout_prob = prediction_proba[0][1]
+            not_dropout_prob = prediction_proba[0][0]
 
-    submit = st.form_submit_button("Prediksi Status")
+            st.subheader("Prediksi Status Dropout:")
+            if dropout_prob > 0.5:
+                st.error(f"Probabilitas Dropout: {dropout_prob:.2%}")
+                st.write("Ada kemungkinan besar siswa akan mengalami dropout.")
+            else:
+                st.success(f"Probabilitas Tidak Dropout: {not_dropout_prob:.2%}")
+                st.write("Kemungkinan besar siswa tidak dropout.")
 
-if submit:
-    # Buat DataFrame input dengan urutan kolom yang benar
-    input_df = pd.DataFrame([input_data], columns=feature_columns)
+    st.markdown("***")
+    st.markdown(
+        "<div style='text-align: center; color: #666; margin-top: 30px;'>Copyright © 2024 | arifsofyan004@gmail.com</div>",
+        unsafe_allow_html=True
+    )
 
-    # Preprocess dan predict
-    X_processed = preprocessor.transform(input_df)
-    prediction = model.predict(X_processed)[0]
-    probas = model.predict_proba(X_processed)[0]
-
-    st.success(f"**Prediksi Status: {label_map[prediction]}**")
-    # Assuming probas are ordered for 0 and 1
-    st.info(f"Probabilitas: Dropout={probas[0]:.2%}, Enrolled/Graduate={probas[1]:.2%}")
-
-    # Feature importance jika tersedia
-    # The model stored is GridSearchCV, so we access the best estimator.
-    if hasattr(model.best_estimator_.named_steps['classifier'], 'feature_importances_'):
-        st.subheader("Top 10 Feature Importance")
-        importances = model.best_estimator_.named_steps['classifier'].feature_importances_
-        # The feature names after preprocessing need to be derived for importance mapping
-        # This requires reconstructing the feature names from the preprocessor
-
-        num_features_out = numerical_cols
-        cat_ohe_features_out = preprocessor.named_transformers_['cat'].get_feature_names_out(categorical_cols)
-        processed_feature_names = list(num_features_out) + list(cat_ohe_features_out)
-
-        feat_imp = pd.DataFrame({'feature': processed_feature_names, 'importance': importances}).sort_values('importance', ascending=False)[:10]
-        st.bar_chart(feat_imp.set_index('feature'))
-
-# Footer
-st.markdown("---")
-st.caption("Proyek Akhir Dicoding: Prediksi Dropout Siswa Edutech [Juniyara Parisya Setiawan]")
+if __name__ == "__main__":
+    main()
