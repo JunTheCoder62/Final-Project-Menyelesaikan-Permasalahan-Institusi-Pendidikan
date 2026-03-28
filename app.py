@@ -1,116 +1,122 @@
 import streamlit as st
 import pandas as pd
 import joblib
-import xgboost as xgb
+import numpy as np
 
-# --- KONFIGURASI HALAMAN ---
+# --- 1. KONFIGURASI & STYLE ---
 st.set_page_config(page_title="Prediksi Dropout Mahasiswa", layout="centered")
 
-# --- LOAD MODEL ---
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; }
+    .result-container {
+        padding: 30px;
+        border-radius: 12px;
+        text-align: center;
+        margin-top: 20px;
+        font-family: 'sans-serif';
+    }
+    .high-risk { background-color: #fdf2f2; border: 1px solid #f8d7da; color: #721c24; }
+    .low-risk { background-color: #f0fff4; border: 1px solid #c6f6d5; color: #22543d; }
+    .prob-text { font-size: 64px; font-weight: 800; margin: 0; }
+    .status-text { font-size: 22px; font-weight: 700; margin: 10px 0; }
+    .sub-text { font-size: 14px; color: #666; font-style: italic; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 2. LOAD MODEL ---
 @st.cache_resource
-def load_model():
+def load_trained_model():
     try:
-        # Menggunakan nama file sesuai permintaan Anda
+        # Memuat file model Anda
         model = joblib.load('xgboost_model.pkl')
         return model
     except Exception as e:
         st.error(f"Gagal memuat model: {e}")
         return None
 
-model = load_model()
+model = load_trained_model()
 
-# --- CUSTOM CSS (Untuk styling hasil prediksi) ---
-st.markdown("""
-    <style>
-    .result-container {
-        padding: 30px;
-        border-radius: 10px;
-        text-align: center;
-        margin-top: 20px;
-    }
-    .high-risk {
-        background-color: #fff5f5;
-        color: #c53030;
-    }
-    .low-risk {
-        background-color: #f0fff4;
-        color: #2f855a;
-    }
-    .prob-text {
-        font-size: 60px;
-        font-weight: bold;
-        margin-bottom: 0px;
-    }
-    .status-text {
-        font-size: 20px;
-        font-weight: 600;
-        margin-top: 10px;
-    }
-    .sub-text {
-        font-size: 14px;
-        color: #718096;
-        font-style: italic;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
+# --- 3. UI INPUT ---
 st.title("📄 Data Mahasiswa")
 
-# --- INPUT FORM (Berdasarkan UI sebelumnya) ---
-with st.expander("💰 Status Finansial", expanded=True):
-    col_fin1 = st.selectbox("Pembayaran SPP", ["Menunggak", "Lunas"])
-    col_fin2 = st.selectbox("Status Beasiswa", ["Bukan Penerima", "Penerima"])
-    col_fin3 = st.selectbox("Status Debitur / Utang", ["Tidak Berutang", "Berutang"])
+with st.container():
+    st.subheader("💰 Status Finansial")
+    col_spp = st.selectbox("Pembayaran SPP", ["Menunggak", "Lunas"])
+    col_beasiswa = st.selectbox("Status Beasiswa", ["Bukan Penerima", "Penerima"])
+    col_utang = st.selectbox("Status Debitur / Utang", ["Tidak Berutang", "Berutang"])
 
-with st.expander("📚 Data Akademik", expanded=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("**Semester 1**")
-        sks_1 = st.slider("SKS Lulus (S1)", 0, 24, 5)
-        nilai_1 = st.number_input("Nilai Rata-rata (0-20) (S1)", 0.0, 20.0, 12.0)
-    with col2:
-        st.write("**Semester 2**")
-        sks_2 = st.slider("SKS Lulus (S2)", 0, 24, 4)
-        nilai_2 = st.number_input("Nilai Rata-rata (0-20) (S2)", 0.0, 20.0, 12.0)
+st.markdown("---")
 
-with st.expander("👤 Profil Mahasiswa", expanded=True):
+with st.container():
+    st.subheader("📚 Semester 1")
+    sks1 = st.slider("SKS Lulus", 0, 30, 5, key="s1_sks")
+    nilai1 = st.number_input("Nilai Rata-rata (0-20)", 0.0, 20.0, 12.0, key="s1_val")
+
+st.markdown("---")
+
+with st.container():
+    st.subheader("📚 Semester 2")
+    sks2 = st.slider("SKS Lulus", 0, 30, 4, key="s2_sks")
+    nilai2 = st.number_input("Nilai Rata-rata (0-20)", 0.0, 20.0, 12.0, key="s2_val")
+
+st.markdown("---")
+
+with st.container():
+    st.subheader("👤 Profil Mahasiswa")
     usia = st.slider("Usia saat Enrollment", 15, 60, 19)
     nilai_masuk = st.number_input("Nilai Masuk (0-200)", 0.0, 200.0, 130.0)
 
-# --- LOGIKA PREDIKSI ---
+# --- 4. LOGIKA PREDIKSI & ALIGNMENT ---
 if st.button("🔍 Prediksi Sekarang", use_container_width=True):
     if model is not None:
-        # 1. Menyiapkan Data Input
-        # Sesuaikan urutan kolom ini dengan fitur saat training model
-        input_data = pd.DataFrame([{
-            'pembayaran_spp': 1 if col_fin1 == "Menunggak" else 0,
-            'beasiswa': 1 if col_fin2 == "Penerima" else 0,
-            'debitur': 1 if col_fin3 == "Berutang" else 0,
-            'sks_S1': sks_1,
-            'nilai_S1': nilai_1,
-            'sks_S2': sks_2,
-            'nilai_S2': nilai_2,
-            'usia': usia,
-            'nilai_masuk': nilai_masuk
-        }])
+        try:
+            # A. Buat DataFrame awal dari input UI
+            # Pastikan nama kolom di sini (kiri) sesuai dengan nama kolom SEBELUM encoding saat training
+            input_df = pd.DataFrame([{
+                'Tuition fees up to date': 1 if col_spp == "Lunas" else 0,
+                'Scholarship holder': 1 if col_beasiswa == "Penerima" else 0,
+                'Debtor': 1 if col_utang == "Berutang" else 1,
+                'Curricular units 1st sem (approved)': sks1,
+                'Curricular units 1st sem (grade)': nilai1,
+                'Curricular units 2nd sem (approved)': sks2,
+                'Curricular units 2nd sem (grade)': nilai2,
+                'Age at enrollment': usia,
+                'Admission grade': nilai_masuk
+            }])
 
-        # 2. Prediksi Probabilitas
-        # predict_proba menghasilkan [prob_class_0, prob_class_1]
-        # Kita ambil indeks [1] untuk probabilitas "Dropout"
-        probabilities = model.predict_proba(input_data)[0]
-        dropout_prob = probabilities[1] * 100 
+            # B. One-Hot Encoding pada input baru
+            input_encoded = pd.get_dummies(input_df)
 
-        # 3. Tampilkan Hasil ala Gambar
-        status_class = "high-risk" if dropout_prob >= 50 else "low-risk"
-        status_label = "Risiko Tinggi — Butuh Intervensi Segera" if dropout_prob >= 70 else "Risiko Rendah / Aman"
-        emoji = "🚨" if dropout_prob >= 70 else "✅"
+            # C. SINKRONISASI FITUR (Mengatasi Error 190 vs 9)
+            # Mengambil daftar fitur yang diharapkan model
+            if hasattr(model, "feature_names_in_"):
+                model_features = model.feature_names_in_
+                # Reindex akan menambah kolom yang hilang (isi 0) dan membuang kolom yang tidak perlu
+                final_input = input_encoded.reindex(columns=model_features, fill_value=0)
+            else:
+                # Jika model bukan pipeline/dataframe-based, Anda mungkin perlu cara manual
+                st.warning("Atribut feature_names_in_ tidak ditemukan. Menggunakan input apa adanya.")
+                final_input = input_encoded
 
-        st.markdown(f"""
-            <div class="result-container {status_class}">
-                <p class="prob-text">{dropout_prob:.1f}%</p>
-                <p class="status-text">{emoji} {status_label}</p>
-                <p class="sub-text">Probabilitas mahasiswa ini mengalami dropout</p>
-            </div>
-            """, unsafe_allow_html=True)
+            # D. Prediksi Probabilitas
+            # [0, 1] -> Indeks 1 biasanya adalah kelas 'Dropout'
+            prob = model.predict_proba(final_input)[0][1] * 100
+
+            # E. Tampilan Hasil (Sesuai Gambar)
+            risk_class = "high-risk" if prob >= 50 else "low-risk"
+            risk_msg = "Risiko Tinggi — Butuh Intervensi Segera" if prob >= 50 else "Risiko Rendah — Mahasiswa Aman"
+            icon = "🚨" if prob >= 50 else "✅"
+
+            st.markdown(f"""
+                <div class="result-container {risk_class}">
+                    <p class="prob-text">{prob:.1f}%</p>
+                    <p class="status-text">{icon} {risk_msg}</p>
+                    <p class="sub-text">Probabilitas mahasiswa ini mengalami dropout</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        except Exception as e:
+            st.error(f"Terjadi kesalahan saat pemrosesan data: {e}")
     else:
-        st.error("Model tidak ditemukan. Pastikan file 'xgboost_model.pkl' ada di folder yang sama.")
+        st.error("Model tidak tersedia.")
