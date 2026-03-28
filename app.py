@@ -3,120 +3,106 @@ import pandas as pd
 import joblib
 import numpy as np
 
-# --- 1. KONFIGURASI & STYLE ---
-st.set_page_config(page_title="Prediksi Dropout Mahasiswa", layout="centered")
+# --- LOAD MODELS ---
+@st.cache_resource
+def load_models():
+    preprocessor = joblib.load('preprocessor_model.pkl')
+    model = joblib.load('xgboost_model.pkl')
+    return preprocessor, model
 
+preprocessor, model = load_models()
+
+# --- UI CONFIGURATION ---
+st.set_page_config(page_title="Prediksi Status Mahasiswa", layout="centered")
+
+# Custom CSS untuk styling mirip gambar (Dark Theme & Red Accents)
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    .result-container {
-        padding: 30px;
-        border-radius: 12px;
-        text-align: center;
-        margin-top: 20px;
-        font-family: 'sans-serif';
-    }
-    .high-risk { background-color: #fdf2f2; border: 1px solid #f8d7da; color: #721c24; }
-    .low-risk { background-color: #f0fff4; border: 1px solid #c6f6d5; color: #22543d; }
-    .prob-text { font-size: 64px; font-weight: 800; margin: 0; }
-    .status-text { font-size: 22px; font-weight: 700; margin: 10px 0; }
-    .sub-text { font-size: 14px; color: #666; font-style: italic; }
+    .main { background-color: #121726; color: white; }
+    .stButton>button { width: 100%; background-color: #e76f51; color: white; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. LOAD MODEL ---
-@st.cache_resource
-def load_trained_model():
-    try:
-        # Memuat file model Anda
-        model = joblib.load('xgboost_model.pkl')
-        return model
-    except Exception as e:
-        st.error(f"Gagal memuat model: {e}")
-        return None
+st.title("📊 Data Mahasiswa")
 
-model = load_trained_model()
-
-# --- 3. UI INPUT ---
-st.title("📄 Data Mahasiswa")
-
+# --- FORM INPUT ---
 with st.container():
     st.subheader("💰 Status Finansial")
-    col_spp = st.selectbox("Pembayaran SPP", ["Menunggak", "Lunas"])
-    col_beasiswa = st.selectbox("Status Beasiswa", ["Bukan Penerima", "Penerima"])
-    col_utang = st.selectbox("Status Debitur / Utang", ["Tidak Berutang", "Berutang"])
+    
+    # Mapping sederhana untuk UI ke Nilai Numerik (sesuaikan dengan dataset asli)
+    tuition = st.selectbox("Pembayaran SPP", ["Tepat Waktu", "Menunggak"], index=1)
+    scholarship = st.selectbox("Status Beasiswa", ["Penerima", "Bukan Penerima"], index=1)
+    debtor = st.selectbox("Status Debitur / Utang", ["Berhutang", "Tidak Berhutang"], index=1)
 
-st.markdown("---")
+    st.divider()
 
-with st.container():
-    st.subheader("📚 Semester 1")
-    sks1 = st.slider("SKS Lulus", 0, 30, 5, key="s1_sks")
-    nilai1 = st.number_input("Nilai Rata-rata (0-20)", 0.0, 20.0, 12.0, key="s1_val")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📚 Semester 1")
+        sks_1 = st.slider("SKS Lulus (Sem 1)", 0, 30, 5)
+        grade_1 = st.number_input("Nilai Rata-rata (0-20) - S1", 0.0, 20.0, 12.00)
 
-st.markdown("---")
+    with col2:
+        st.subheader("📚 Semester 2")
+        sks_2 = st.slider("SKS Lulus (Sem 2)", 0, 30, 4)
+        grade_2 = st.number_input("Nilai Rata-rata (0-20) - S2", 0.0, 20.0, 12.00)
 
-with st.container():
-    st.subheader("📚 Semester 2")
-    sks2 = st.slider("SKS Lulus", 0, 30, 4, key="s2_sks")
-    nilai2 = st.number_input("Nilai Rata-rata (0-20)", 0.0, 20.0, 12.0, key="s2_val")
+    st.divider()
 
-st.markdown("---")
-
-with st.container():
     st.subheader("👤 Profil Mahasiswa")
-    usia = st.slider("Usia saat Enrollment", 15, 60, 19)
-    nilai_masuk = st.number_input("Nilai Masuk (0-200)", 0.0, 200.0, 130.0)
+    age = st.slider("Usia saat Enrollment", 14, 60, 19)
+    admission_grade = st.number_input("Nilai Masuk (0-200)", 0.0, 200.0, 130.0)
 
-# --- 4. LOGIKA PREDIKSI & ALIGNMENT ---
-if st.button("🔍 Prediksi Sekarang", use_container_width=True):
-    if model is not None:
-        try:
-            # A. Buat DataFrame awal dari input UI
-            # Pastikan nama kolom di sini (kiri) sesuai dengan nama kolom SEBELUM encoding saat training
-            input_df = pd.DataFrame([{
-                'Tuition fees up to date': 1 if col_spp == "Lunas" else 0,
-                'Scholarship holder': 1 if col_beasiswa == "Penerima" else 0,
-                'Debtor': 1 if col_utang == "Berutang" else 1,
-                'Curricular units 1st sem (approved)': sks1,
-                'Curricular units 1st sem (grade)': nilai1,
-                'Curricular units 2nd sem (approved)': sks2,
-                'Curricular units 2nd sem (grade)': nilai2,
-                'Age at enrollment': usia,
-                'Admission grade': nilai_masuk
-            }])
+# --- PREDICTION LOGIC ---
+if st.button("🔍 Prediksi Sekarang"):
+    # 1. Siapkan DataFrame mentah sesuai kolom yang diharapkan preprocessor
+    # Catatan: Sesuaikan nama kolom di bawah dengan nama kolom di df asli Anda
+    input_data = pd.DataFrame({
+        'Tuition_fees_up_to_date': [1 if tuition == "Tepat Waktu" else 0],
+        'Scholarship_holder': [1 if scholarship == "Penerima" else 0],
+        'Debtor': [1 if debtor == "Berhutang" else 0],
+        'Curricular_units_1st_sem_approved': [sks_1],
+        'Curricular_units_1st_sem_grade': [grade_1],
+        'Curricular_units_2nd_sem_approved': [sks_2],
+        'Curricular_units_2nd_sem_grade': [grade_2],
+        'Age_at_enrollment': [age],
+        'Admission_grade': [admission_grade],
+        # Tambahkan kolom lain yang dibutuhkan preprocessor dengan nilai default jika tidak ada di UI
+        'Previous_qualification_grade': [120.0], 
+        'Curricular_units_1st_sem_credited': [0],
+        'Curricular_units_1st_sem_evaluations': [0],
+        'Curricular_units_1st_sem_without_evaluations': [0],
+        'Curricular_units_2nd_sem_without_evaluations': [0],
+        'Unemployment_rate': [11.0],
+        'Inflation_rate': [0.5],
+        'GDP': [1.0],
+        'Application_mode': [1],
+        'Application_order': [1],
+        'Course': [1],
+        'Mothers_qualification': [1],
+        'Fathers_qualification': [1],
+        'Mothers_occupation': [1],
+        'Fathers_occupation': [1],
+        'Displaced': [1],
+        'Gender': [1]
+    })
 
-            # B. One-Hot Encoding pada input baru
-            input_encoded = pd.get_dummies(input_df)
-
-            # C. SINKRONISASI FITUR (Mengatasi Error 190 vs 9)
-            # Mengambil daftar fitur yang diharapkan model
-            if hasattr(model, "feature_names_in_"):
-                model_features = model.feature_names_in_
-                # Reindex akan menambah kolom yang hilang (isi 0) dan membuang kolom yang tidak perlu
-                final_input = input_encoded.reindex(columns=model_features, fill_value=0)
-            else:
-                # Jika model bukan pipeline/dataframe-based, Anda mungkin perlu cara manual
-                st.warning("Atribut feature_names_in_ tidak ditemukan. Menggunakan input apa adanya.")
-                final_input = input_encoded
-
-            # D. Prediksi Probabilitas
-            # [0, 1] -> Indeks 1 biasanya adalah kelas 'Dropout'
-            prob = model.predict_proba(final_input)[0][1] * 100
-
-            # E. Tampilan Hasil (Sesuai Gambar)
-            risk_class = "high-risk" if prob >= 50 else "low-risk"
-            risk_msg = "Risiko Tinggi — Butuh Intervensi Segera" if prob >= 50 else "Risiko Rendah — Mahasiswa Aman"
-            icon = "🚨" if prob >= 50 else "✅"
-
-            st.markdown(f"""
-                <div class="result-container {risk_class}">
-                    <p class="prob-text">{prob:.1f}%</p>
-                    <p class="status-text">{icon} {risk_msg}</p>
-                    <p class="sub-text">Probabilitas mahasiswa ini mengalami dropout</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-        except Exception as e:
-            st.error(f"Terjadi kesalahan saat pemrosesan data: {e}")
-    else:
-        st.error("Model tidak tersedia.")
+    try:
+        # 2. Transformasi data menggunakan preprocessor yang sudah di-load
+        processed_data = preprocessor.transform(input_data)
+        
+        # 3. Prediksi
+        prediction = model.predict(processed_data)
+        
+        # 4. Tampilkan Hasil
+        st.markdown("---")
+        if prediction[0] == 0:
+            st.error("### Hasil Prediksi: **Dropout**")
+            st.write("Mahasiswa berisiko tinggi tidak menyelesaikan pendidikan.")
+        else:
+            st.success("### Hasil Prediksi: **Graduate**")
+            st.write("Mahasiswa diprediksi akan menyelesaikan pendidikan dengan baik.")
+            
+    except Exception as e:
+        st.error(f"Terjadi kesalahan saat memproses data: {e}")
