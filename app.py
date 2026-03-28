@@ -1,99 +1,145 @@
 !pip install streamlit
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import os
 
-# Load model
-# Pastikan file model ada di direktori yang sama
-try:
-    model = joblib.load('xgboost_model.pkl')
-except:
-    st.error("Model 'xgboost_model.pkl' tidak ditemukan. Pastikan file tersedia.")
-
-# Load Image (Opsional: tambahkan handling jika image tidak ada)
-image = 'Juniyara Parisya Setiawan-Dashboard.jpg'
+# Menggunakan cache agar model tidak dimuat ulang setiap kali input diubah
+@st.cache_resource
+def load_model():
+    return joblib.load('xgboost_model.pkl')
 
 def display_sidebar():
     st.sidebar.subheader("Masukkan Data Siswa")
 
-    # MAPPING: Sesuaikan angka di bawah ini dengan urutan saat Anda training model
-    # Contoh: Single = 1, Married = 2, dst.
+    marital_status = st.sidebar.selectbox("Status Pernikahan", ["Single", "Married", "Divorced"], key='marital_status')
+    application_mode = st.sidebar.selectbox("Mode Pendaftaran", [
+        "1st phase - general contingent", "2nd phase - general contingent", "International student (bachelor)",
+        "Over 23 years old", "Change of course", "Technological specialization diploma holders",
+        "Holders of other higher courses", "3rd phase - general contingent", "Transfer",
+        "Change of institution/course", "1st phase - special contingent (Madeira Island)",
+        "Short cycle diploma holders", "1st phase - special contingent (Azores Island)",
+        "Ordinance No. 854-B/99", "Ordinance No. 612/93", "Change of institution/course (International)",
+        "Ordinance No. 533-A/99, item b2 (Different Plan)", "Ordinance No. 533-A/99, item b3 (Other Institution)"
+    ], key='application_mode')
     
-    marital_status = st.sidebar.selectbox("Status Pernikahan", ["Single", "Married", "Divorced"])
+    application_order = st.sidebar.selectbox("Pilihan Kursus", ["First Choice", "Second Choice"], key='application_order')
+    course = st.sidebar.selectbox("Program Studi", [
+        "Animation and Multimedia Design", "Tourism", "Communication Design", "Journalism and Communication",
+        "Social Service (evening attendance)", "Management", "Social Service", "Veterinary Nursing",
+        "Advertising and Marketing Management", "Management (evening attendance)", "Agronomy",
+        "Basic Education", "Informatics Engineering", "Equinculture", "Oral Hygiene", "Biofuel Production Technologies"
+    ], key='course')
     
-    # ... (Dropdown lainnya tetap sama) ...
+    daytime_evening_attendance = st.sidebar.selectbox("Waktu Kuliah", ["Daytime", "Evening"], key='daytime_evening_attendance')
+    previous_qualification_grade = st.sidebar.slider("Nilai Kualifikasi Sebelumnya", min_value=0, max_value=200, step=1, key='previous_qualification_grade')
+    nationality = st.sidebar.selectbox("Kebangsaan", [
+        "Portuguese", "German", "Spanish", "Italian", "Dutch", "English", "Lithuanian", "Angolan",
+        "Cape Verdean", "Guinean", "Mozambican", "Santomean", "Turkish", "Brazilian", "Romanian",
+        "Moldova (Republic of)", "Mexican", "Ukrainian", "Russian", "Cuban", "Colombian"
+    ], key='nationality')
     
-    # Contoh penggunaan Slider & Number Input
-    previous_qualification_grade = st.sidebar.slider("Nilai Kualifikasi Sebelumnya", 0, 200, 100)
-    admission_grade = st.sidebar.slider("Nilai Penerimaan", 0, 200, 100)
-    age_at_enrollment = st.sidebar.number_input("Usia Saat Pendaftaran", value=18)
+    mothers_qualification = st.sidebar.selectbox("Kualifikasi Ibu", ["Basic Education", "Secondary Education", "Higher Education", "Other"], key='mothers_qualification')
+    fathers_qualification = st.sidebar.selectbox("Kualifikasi Ayah", ["Basic Education", "Secondary Education", "Higher Education", "Other"], key='fathers_qualification')
+    mothers_occupation = st.sidebar.selectbox("Pekerjaan Ibu", [
+        "Unskilled Workers", "Administrative Staff", "Service Workers", "Technicians", "Professionals",
+        "Skilled Workers", "Student", "Managers", "Agricultural Workers", "Other", "Machine Operators"
+    ], key='mothers_occupation')
+    fathers_occupation = st.sidebar.selectbox("Pekerjaan Ayah", [
+        "Unskilled Workers", "Skilled Workers", "Service Workers", "Administrative Staff", "Technicians",
+        "Machine Operators", "Armed Forces", "Agricultural Workers", "Professionals", "Managers", "Student", "Other"
+    ], key='fathers_occupation')
     
-    # Input Akademik
-    c1_credited = st.sidebar.number_input("Units 1st Sem (credited)", 0)
-    c1_enrolled = st.sidebar.number_input("Units 1st Sem (enrolled)", 0)
-    c1_eval = st.sidebar.number_input("Units 1st Sem (evaluations)", 0)
-    c1_approved = st.sidebar.number_input("Units 1st Sem (approved)", 0)
-    c1_grade = st.sidebar.number_input("Units 1st Sem (grade)", 0.0)
+    admission_grade = st.sidebar.slider("Nilai Penerimaan", min_value=0, max_value=200, step=1, key='admission_grade')
+    displaced = st.sidebar.selectbox("Apakah siswa tersebut adalah orang yang terlantar", ["Yes", "No"], key='displaced')
+    educational_special_needs = st.sidebar.selectbox("Kebutuhan Pendidikan Khusus", ["Yes", "No"], key='educational_special_needs')
+    debtor = st.sidebar.selectbox("Debitor", ["Yes", "No"], key='debtor')
+    tuition_fees_up_to_date = st.sidebar.selectbox("Biaya Kuliah Terbayar", ["Yes", "No"], key='tuition_fees_up_to_date')
+    gender = st.sidebar.selectbox("Jenis Kelamin", ["Male", "Female"], key='gender')
+    scholarship_holder = st.sidebar.selectbox("Penerima Beasiswa", ["Yes", "No"], key='scholarship_holder')
     
-    # FITUR BINARY (MAPPING KE 0 DAN 1)
-    # Sangat penting: XGBoost biasanya tidak menerima teks "Yes"/"No"
-    displaced = 1 if st.sidebar.selectbox("Terlantar?", ["Yes", "No"]) == "Yes" else 0
-    scholarship = 1 if st.sidebar.selectbox("Penerima Beasiswa?", ["Yes", "No"]) == "Yes" else 0
-    tuition_up_to_date = 1 if st.sidebar.selectbox("Biaya Kuliah Lunas?", ["Yes", "No"]) == "Yes" else 0
-    gender = 1 if st.sidebar.selectbox("Jenis Kelamin", ["Male", "Female"]) == "Male" else 0
+    age_at_enrollment = st.sidebar.number_input("Usia Saat Pendaftaran", key='age_at_enrollment', format='%f')
+    international = st.sidebar.selectbox("Apakah siswa tersebut adalah siswa internasional", ["Yes", "No"], key='international')
+    
+    curricular_units_1st_sem_credited = st.sidebar.number_input("Curricular units 1st sem (credited)", min_value=0, key='curricular_units_1st_sem_credited')
+    curricular_units_1st_sem_enrolled = st.sidebar.number_input("Curricular units 1st sem (enrolled)", min_value=0, key='curricular_units_1st_sem_enrolled')
+    curricular_units_1st_sem_evaluations = st.sidebar.number_input("Curricular units 1st sem (evaluations)", min_value=0, key='curricular_units_1st_sem_evaluations')
+    curricular_units_1st_sem_grade = st.sidebar.number_input("Curricular units 1st sem (grade)", key='curricular_units_1st_sem_grade')
+    curricular_units_1st_sem_approved = st.sidebar.number_input("Curricular units 1st sem (approved)", min_value=0, key='curricular_units_1st_sem_approved')
+    curricular_units_1st_sem_without_evaluations = st.sidebar.number_input("Curricular units 1st sem (without evaluations)", key='curricular_units_1st_sem_without_evaluations')
+    curricular_units_2nd_sem_without_evaluations = st.sidebar.number_input("Curricular units 2nd sem (without evaluations)", key='curricular_units_2nd_sem_without_evaluations')
+    
+    unemployment_rate = st.sidebar.number_input("Unemployment Rate", key='unemployment_rate', format='%f')
+    inflation_rate = st.sidebar.number_input("Inflation Rate", key='inflation_rate', format='%f')
+    gdp = st.sidebar.number_input("GDP", key='gdp', format='%f')
 
-    # Kumpulkan SEMUA kolom yang digunakan saat training (Urutan harus sama!)
-    # Saya asumsikan ini adalah list kolom yang dibutuhkan XGBoost Anda
-    data = {
-        'Previous_qualification_grade': previous_qualification_grade,
-        'Admission_grade': admission_grade,
-        'Age_at_enrollment': age_at_enrollment,
-        'Displaced': displaced,
-        'Scholarship_holder': scholarship,
-        'Tuition_fees_up_to_date': tuition_up_to_date,
-        'Gender': gender,
-        'Curricular_units_1st_sem_credited': c1_credited,
-        'Curricular_units_1st_sem_enrolled': c1_enrolled,
-        'Curricular_units_1st_sem_evaluations': c1_eval,
-        'Curricular_units_1st_sem_approved': c1_approved,
-        'Curricular_units_1st_sem_grade': c1_grade,
-        # Tambahkan fitur lainnya di sini sesuai jumlah kolom saat training...
-    }
-    
-    return pd.DataFrame([data])
+    input_data = pd.DataFrame({
+        'Previous_qualification_grade': [previous_qualification_grade],
+        'Admission_grade': [admission_grade],
+        'Age_at_enrollment': [age_at_enrollment],
+        'Curricular_units_1st_sem_credited': [curricular_units_1st_sem_credited],
+        'Curricular_units_1st_sem_evaluations': [curricular_units_1st_sem_evaluations],
+        'Curricular_units_1st_sem_grade': [curricular_units_1st_sem_grade],
+        'Curricular_units_1st_sem_without_evaluations': [curricular_units_1st_sem_without_evaluations],
+        'Curricular_units_2nd_sem_without_evaluations': [curricular_units_2nd_sem_without_evaluations],
+        'Unemployment_rate': [unemployment_rate],
+        'Inflation_rate': [inflation_rate],
+        'GDP': [gdp],
+        'Application_mode': [application_mode],
+        'Application_order': [application_order],
+        'Course': [course],
+        'Mothers_qualification': [mothers_qualification],
+        'Fathers_qualification': [fathers_qualification],
+        'Mothers_occupation': [mothers_occupation],
+        'Fathers_occupation': [fathers_occupation],
+        'Displaced': [displaced],
+        'Gender': [gender]
+    })
+
+    return input_data
+
+def predict_status_proba(model, data):
+    # Jika model XGBoost Anda butuh data kategorikal, pastikan encoding sesuai dengan saat training.
+    # Misalnya jika perlu One-Hot atau Label Encoding, letakkan transformasinya di sini.
+    prediction_proba = model.predict_proba(data)
+    return prediction_proba
 
 def main():
-    st.set_page_config(page_title="Prediksi Dropout Siswa", layout="wide")
+    # Set page config HARUS menjadi command streamlit pertama
+    st.set_page_config(page_title="Aplikasi Prediksi Dropout", page_icon=":bar_chart:", layout="wide")
 
-    # Header Image
-    try:
-        st.image(image, use_container_width=True) # Versi terbaru pakai use_container_width
-    except:
-        st.title("Aplikasi Prediksi Dropout Siswa")
+    # Pastikan gambar ada sebelum dimuat untuk mencegah error
+    image_path = 'Juniyara Parisya Setiawan-Dashboard.jpg'
+    if os.path.exists(image_path):
+        st.image(image_path, use_column_width=True)
+    else:
+        st.warning(f"Gambar {image_path} tidak ditemukan. Pastikan file ada di folder yang sama.")
 
+    model = load_model()
     input_data = display_sidebar()
 
-    st.write("### Data yang Dimasukkan:")
-    st.dataframe(input_data) # Menampilkan data agar user bisa cek
+    st.markdown("---") # Garis pembatas yang benar menggunakan 3 dash
 
     if st.sidebar.button("Prediksi"):
-        # Prediksi
-        prediction = model.predict(input_data)
-        prediction_proba = model.predict_proba(input_data)
-
-        st.markdown("---")
-        st.subheader("Hasil Analisis:")
-
-        # Asumsi: 1 adalah Dropout, 0 adalah Graduated/Enrolled
-        prob_dropout = prediction_proba[0][1] 
-        
-        if prediction[0] == 1:
-            st.error(f"⚠️ **HASIL: DROPOUT** (Probabilitas: {prob_dropout:.2%})")
-            st.info("Saran: Siswa ini memerlukan pendampingan akademik lebih lanjut.")
+        if input_data.isnull().values.any():
+            st.error("Harap isi semua data siswa terlebih dahulu.")
         else:
-            st.success(f"✅ **HASIL: TIDAK DROPOUT** (Probabilitas Aman: {1 - prob_dropout:.2%})")
+            try:
+                prediction_proba = predict_status_proba(model, input_data)
+                dropout_prob = prediction_proba[0][1]
+                not_dropout_prob = prediction_proba[0][0]
+
+                st.subheader("Prediksi Status Dropout:")
+                if dropout_prob > 0.5:
+                    st.error(f"Probabilitas Dropout: {dropout_prob:.2%}")
+                    st.write("Ada kemungkinan besar siswa akan mengalami dropout.")
+                else:
+                    st.success(f"Probabilitas Tidak Dropout: {not_dropout_prob:.2%}")
+                    st.write("Kemungkinan besar siswa tidak dropout.")
+            except Exception as e:
+                st.error(f"Terjadi error saat melakukan prediksi. Pesan error: {e}")
+                st.info("Catatan: Pastikan kolom DataFrame di atas sudah persis sama (termasuk huruf besar/kecil dan tipe datanya) dengan data saat model di-training.")
 
 if __name__ == "__main__":
     main()
