@@ -15,7 +15,7 @@ Sumber data: ....
 
 Setup environment:
 ```
-
+!pip install -r requirements.txt
 ```
 
 ## Business Dashboard
