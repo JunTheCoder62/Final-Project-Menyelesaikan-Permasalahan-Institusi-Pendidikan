@@ -4,72 +4,88 @@ import numpy as np
 import joblib
 import os
 
-# 1. Optimasi Loading Model: Menggunakan cache_resource agar hanya dimuat 1x selama app berjalan
+# ---------------------------------------------------------
+# 1. KONFIGURASI HALAMAN & LOADING
+# ---------------------------------------------------------
+st.set_page_config(page_title="Prediksi Dropout Siswa", page_icon=":bar_chart:", layout="wide")
+
 @st.cache_resource
 def load_model():
-    # Pastikan file model ada
-    if os.path.exists('xgboost_model.pkl'):
-        return joblib.load('xgboost_model.pkl')
+    """Memuat model machine learning secara efisien."""
+    model_path = 'xgboost_model.pkl'
+    if os.path.exists(model_path):
+        return joblib.load(model_path)
     return None
 
 def main():
-    # Set page config (Harus paling atas)
-    st.set_page_config(page_title="Prediksi Dropout Siswa", page_icon=":bar_chart:", layout="wide")
-
-    # Header Gambar (Gunakan use_container_width yang lebih baru dari use_column_width)
+    # Header Gambar
     image_path = 'Juniyara Parisya Setiawan-Dashboard.jpg'
     if os.path.exists(image_path):
         st.image(image_path, use_container_width=True)
+    else:
+        st.title("🎓 Sistem Prediksi Dropout Siswa")
 
     model = load_model()
     if model is None:
-        st.error("Model 'xgboost_model.pkl' tidak ditemukan!")
+        st.error("⚠️ File model 'xgboost_model.pkl' tidak ditemukan di direktori!")
         return
 
-    # 2. GUNAKAN FORM: Ini kunci agar aplikasi tidak lambat/rerun setiap input diubah
+    # ---------------------------------------------------------
+    # 2. SIDEBAR: INPUT DATA (MENGGUNAKAN FORM)
+    # ---------------------------------------------------------
     with st.sidebar.form(key='student_data_form'):
         st.subheader("📝 Masukkan Data Siswa")
         
-        # Kolom Sidebar (Dikelompokkan agar lebih rapi)
-        marital_status = st.selectbox("Status Pernikahan", ["Single", "Married", "Divorced"])
-        application_mode = st.selectbox("Mode Pendaftaran", ["1st phase - general contingent", "2nd phase - general contingent", "International student (bachelor)", "Over 23 years old", "Change of course", "Others"])
-        application_order = st.selectbox("Pilihan Kursus", ["First Choice", "Second Choice"])
-        course = st.selectbox("Program Studi", ["Informatics Engineering", "Management", "Social Service", "Tourism", "Others"])
+        # Data Demografi & Sosial
+        gender = st.selectbox("Jenis Kelamin", ["Male", "Female"])
+        marital_status = st.selectbox("Status Pernikahan", ["Single", "Married", "Divorced", "Others"])
+        displaced = st.selectbox("Terlantar/Displaced?", ["Yes", "No"])
+        scholarship = st.selectbox("Penerima Beasiswa?", ["Yes", "No"])
         
-        # Slider & Number Input
-        previous_qualification_grade = st.slider("Nilai Kualifikasi Sebelumnya", 0, 200, 100)
-        admission_grade = st.slider("Nilai Penerimaan", 0, 200, 100)
+        # Data Akademik & Pendaftaran
+        st.markdown("---")
+        course = st.selectbox("Program Studi", ["Informatics Engineering", "Management", "Social Service", "Tourism", "Others"])
+        application_mode = st.selectbox("Mode Pendaftaran", ["1st phase", "2nd phase", "International", "Over 23 years old", "Change of course", "Others"])
+        application_order = st.selectbox("Pilihan Kursus", ["First Choice", "Second Choice", "Others"])
         age_at_enrollment = st.number_input("Usia Saat Pendaftaran", min_value=15, max_value=100, value=20)
         
-        # Input Akademik Semesters
+        # Nilai & Kualifikasi
+        previous_qualification_grade = st.slider("Nilai Kualifikasi Sebelumnya", 0, 200, 100)
+        admission_grade = st.slider("Nilai Penerimaan", 0, 200, 100)
+        
+        # Unit Akademik (Semester 1 & 2)
         st.markdown("---")
-        st.caption("Data Akademik Semester 1 & 2")
+        st.caption("Data Akademik Unit Kurikuler")
         cu1_credited = st.number_input("Units 1st Sem (Credited)", 0)
         cu1_eval = st.number_input("Units 1st Sem (Evaluations)", 0)
         cu1_grade = st.number_input("Units 1st Sem (Grade)", 0.0)
         cu1_no_eval = st.number_input("Units 1st Sem (Without Eval)", 0)
         cu2_no_eval = st.number_input("Units 2nd Sem (Without Eval)", 0)
 
-        # Input Ekonomi
+        # Faktor Ekonomi Nasional
         st.markdown("---")
         unemployment = st.number_input("Unemployment Rate", 0.0)
         inflation = st.number_input("Inflation Rate", 0.0)
         gdp = st.number_input("GDP", 0.0)
 
-        # Dropdown kategori lainnya
-        gender = st.selectbox("Jenis Kelamin", ["Male", "Female"])
-        displaced = st.selectbox("Terlantar?", ["Yes", "No"])
-        scholarship = st.selectbox("Penerima Beasiswa?", ["Yes", "No"])
-
-        # Tombol Submit Form
+        # Tombol Submit
         submit_button = st.form_submit_button(label='🚀 Lakukan Prediksi')
 
-    # 3. Logika Prediksi: Hanya berjalan jika tombol ditekan
+    # ---------------------------------------------------------
+    # 3. LOGIKA PREDIKSI & MAPPING
+    # ---------------------------------------------------------
     if submit_button:
-        # Menyiapkan data untuk prediksi
-        # PENTING: Jika model XGBoost Anda hasil trainingnya menggunakan angka (0,1), 
-        # pastikan Anda melakukan mapping/encoding di sini sebelum dimasukkan ke DataFrame.
+        # Mapping Kategorikal ke Numerik (Sesuaikan dengan LabelEncoder saat training)
+        # Contoh mapping standar (silakan disesuaikan dengan dataset Anda):
+        gender_map = 1 if gender == "Male" else 0
+        scholarship_map = 1 if scholarship == "Yes" else 0
+        displaced_map = 1 if displaced == "Yes" else 0
         
+        # Mapping sederhana untuk Course & Mode (Misal: Others = 0, sisanya berurutan)
+        # CATATAN: Idealnya Anda menggunakan joblib.load('encoder.pkl') jika ada.
+        course_dict = {"Informatics Engineering": 1, "Management": 2, "Social Service": 3, "Tourism": 4, "Others": 0}
+        mode_dict = {"1st phase": 1, "2nd phase": 2, "International": 3, "Over 23 years old": 4, "Change of course": 5, "Others": 0}
+
         input_dict = {
             'Previous_qualification_grade': previous_qualification_grade,
             'Admission_grade': admission_grade,
@@ -82,14 +98,50 @@ def main():
             'Unemployment_rate': unemployment,
             'Inflation_rate': inflation,
             'GDP': gdp,
-            # Perhatian: Tambahkan mapping untuk kolom kategorikal di bawah ini jika model Anda bukan native categorical
-            'Application_mode': application_mode,
-            'Application_order': application_order,
-            'Course': course,
-            'Displaced': displaced,
-            'Gender': gender
+            'Application_mode': mode_dict.get(application_mode, 0),
+            'Course': course_dict.get(course, 0),
+            'Displaced': displaced_map,
+            'Gender': gender_map,
+            'Scholarship_holder': scholarship_map
         }
 
+        # Konversi ke DataFrame
         df_input = pd.DataFrame([input_dict])
 
         with st.spinner('Menganalisis data...'):
+            try:
+                # Proses Prediksi
+                prediction = model.predict(df_input)
+                prediction_proba = model.predict_proba(df_input)
+
+                # 4. TAMPILAN HASIL
+                st.divider()
+                st.subheader("📊 Hasil Analisis Prediksi")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Asumsi: 1 = Dropout, 0 = Graduate/Enrolled
+                    if prediction[0] == 1:
+                        st.error("### 🟥 Prediksi: **POTENSI DROPOUT**")
+                        st.write("Siswa ini memiliki risiko tinggi untuk tidak menyelesaikan studinya.")
+                    else:
+                        st.success("### 🟩 Prediksi: **BERTAHAN (SUCCESS)**")
+                        st.write("Siswa ini diprediksi akan melanjutkan atau menyelesaikan studinya.")
+                
+                with col2:
+                    confidence = np.max(prediction_proba) * 100
+                    st.metric("Tingkat Kepercayaan (Confidence)", f"{confidence:.2f}%")
+                    
+                    # Progres Bar Kepercayaan
+                    st.progress(confidence / 100)
+
+                # Opsional: Tampilkan data yang dikirim ke model (untuk debugging)
+                with st.expander("Lihat Detail Data Input"):
+                    st.dataframe(df_input)
+
+            except Exception as e:
+                st.error(f"❌ Terjadi kesalahan teknis: {e}")
+
+if __name__ == "__main__":
+    main()
