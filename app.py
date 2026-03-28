@@ -20,7 +20,7 @@ st.set_page_config(page_title="Prediksi Status Mahasiswa", layout="centered")
 @st.cache_resource
 def load_model():
     try:
-        model = joblib.load('xgboost.pkl')
+        model = joblib.load('xgboost_model.pkl')
         return model
     except Exception as e:
         st.error(f"Gagal memuat model: {e}")
