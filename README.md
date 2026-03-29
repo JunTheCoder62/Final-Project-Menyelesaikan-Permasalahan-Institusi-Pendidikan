@@ -37,7 +37,7 @@ Kondisi akademik mahasiswa di Jaya Jaya Institut dari total populasi sebanyak 4.
 Pada bagian bawah dashboard juga mengindikasikan adanya korelasi antara performa akademik dengan tingkat retensi; di mana mahasiswa yang dropout cenderung memiliki rekam jejak penyelesaian unit kurikuler (mata kuliah yang disetujui/lulus) yang jauh lebih rendah dibandingkan dengan yang sudah lulus
 
 ## Menjalankan Sistem Machine Learning
-
+Akses Streamlit: [Link]()
 Untuk menjalankan Predict model ```xgboost_model.pkl``` dapat dilakukan dengan:
 1. Download Repositories
    ```
