@@ -68,7 +68,7 @@ if st.button("🔍 Prediksi Sekarang"):
         'Curricular_units_2nd_sem_grade': [grade_2],
         'Age_at_enrollment': [age],
         'Admission_grade': [admission_grade],
-        # Tambahkan kolom lain yang dibutuhkan preprocessor dengan nilai default jika tidak ada di UI
+        
         'Previous_qualification_grade': [120.0], 
         'Curricular_units_1st_sem_credited': [0],
         'Curricular_units_1st_sem_evaluations': [0],
@@ -89,13 +89,13 @@ if st.button("🔍 Prediksi Sekarang"):
     })
 
     try:
-        # 2. Transformasi data menggunakan preprocessor yang sudah di-load
+# Transformasi data menggunakan preprocessor yang sudah di-load
         processed_data = preprocessor.transform(input_data)
         
-        # 3. Prediksi
+# Prediksi
         prediction = model.predict(processed_data)
         
-        # 4. Tampilkan Hasil
+# Tampilkan Hasil
         st.markdown("---")
         if prediction[0] == 0:
             st.error("### Hasil Prediksi: **Dropout**")
